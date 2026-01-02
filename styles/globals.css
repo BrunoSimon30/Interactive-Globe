@@ -1,0 +1,65 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap');
+@import "tailwindcss";
+ 
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  
+  /* Futuristic Color Palette */
+  --accent-blue: #00d4ff;
+  --accent-teal: #00ffd1;
+  --accent-white: #ffffff;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a2e;
+  
+  /* Region Glows */
+  --caribbean-glow: #00d4ff;
+  --africa-glow: #00ff88;
+  --europe-glow: #ffd700;
+  --asia-glow: #4da6ff;
+  --global-glow: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--foreground);
+  font-family: "Quicksand", sans-serif;
+  overflow: hidden;
+}
+
+ 
+
+/* Smooth scrolling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+
+.bg-gradient-to-br {
+  --tw-gradient-position: to bottom right in oklab;
+  background-image: linear-gradient(var(--tw-gradient-stops));
+}
+
+.bg-\[linear-gradient\(rgba\(0\,217\,255\,0\.03\)_1px\,transparent_1px\)\,linear-gradient\(90deg\,rgba\(0\,217\,255\,0\.03\)_1px\,transparent_1px\)\] {
+  background-image: linear-gradient(#00d9ff08 1px, #0000 1px), linear-gradient(90deg, #00d9ff08 1px, #0000 1px);
+}
