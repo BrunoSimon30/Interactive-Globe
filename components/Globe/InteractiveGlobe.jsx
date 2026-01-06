@@ -455,7 +455,7 @@ export default function InteractiveGlobe({ selectedRegion, onRegionClick }) {
           onRegionClick={onRegionClick}
           onRegionHover={setHoveredRegion}
         />
-
+<Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/horn-koppe_spring_1k.hdr" background={true} />
      <OrbitControls
       minDistance={5}
       maxDistance={6}

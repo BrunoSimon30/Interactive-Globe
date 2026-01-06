@@ -49,7 +49,7 @@ function DraggableSphere() {
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      <Sphere ref={sphereRef} args={[4, 90, 90]}>
+      <Sphere ref={sphereRef} args={[4, 25, 25]}>
         <meshPhysicalMaterial
           color="#ffffff"
           metalness={0.9}
@@ -60,7 +60,7 @@ function DraggableSphere() {
           specularIntensity={2}
           opacity={0.95}
           transparent
-          wireframe
+         
         />
       </Sphere>
     </group>
@@ -77,7 +77,7 @@ export default function Index() {
         <directionalLight position={[-5, 5, -5]} intensity={0.5} />
         <Environment
     files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/radkow_lake_2k.hdr" // path to HDR image
-    background={false} // true -> sets it as scene background
+    background={true} // true -> sets it as scene background
   />
  
         {/* Sphere with mouse drag rotation */}
