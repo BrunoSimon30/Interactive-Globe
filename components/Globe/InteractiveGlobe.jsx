@@ -40,9 +40,9 @@ function RegionHotspot({ region, isSelected, isHovered, onClick, onHover }) {
     <group position={position}>
       <mesh
         ref={meshRef}
-        // onClick={onClick}
-        // onPointerOver={onHover}
-        // onPointerOut={() => onHover(false)}
+        onClick={onClick}
+        onPointerOver={onHover}
+        onPointerOut={() => onHover(false)}
       >
         <sphereGeometry args={[0.05, 16, 16]} />
         <meshStandardMaterial
@@ -235,12 +235,6 @@ function CountryPolygons({ countries }) {
   }, [countries, convertGeoJSONTo3D]);
 
   if (countryGeometries.geometries.length === 0) return null;
-  console.log(
-    "Country geometries:",
-    countryGeometries.geometries.length,
-    "Borders:",
-    countryGeometries.borders.length
-  );
 
   return (
     <>
@@ -296,28 +290,122 @@ function Globe({
   const globeRef = useRef();
   const inglobeRef = useRef();
   const [countries, setCountries] = useState([]);
+  
+  // ✅ Drag state using refs (to avoid infinite re-renders)
+  const targetRotationX = useRef(0);
+  const targetRotationY = useRef(0);
+  const mouseDown = useRef(false);
+  const lastMouseX = useRef(0);
+  const lastMouseY = useRef(0);
+  const currentMouseX = useRef(0); // Global mouse position tracker
+  const currentMouseY = useRef(0);
+
+  const dragFactor = 0.003; // ✅ Reduced for smoother movement
+  const slowingFactor = 0.92; // ✅ Adjusted for better inertia
+
+  // ✅ Global mouse position tracker
+  useEffect(() => {
+    const trackMouse = (e) => {
+      currentMouseX.current = e.clientX;
+      currentMouseY.current = e.clientY;
+    };
+    document.addEventListener('mousemove', trackMouse, { passive: true });
+    return () => document.removeEventListener('mousemove', trackMouse);
+  }, []);
+
+  // ✅ Document-level pointer move/up handlers for smooth dragging
+  useEffect(() => {
+    if (selectedRegion) return; // Don't set up drag when region is selected
+
+    const handlePointerMove = (e) => {
+      if (!mouseDown.current) return;
+      
+      const deltaX = e.clientX - lastMouseX.current;
+      const deltaY = e.clientY - lastMouseY.current;
+      
+      targetRotationX.current = deltaX * dragFactor;
+      targetRotationY.current = deltaY * dragFactor;
+      lastMouseX.current = e.clientX;
+      lastMouseY.current = e.clientY;
+    };
+
+    const handlePointerUp = (e) => {
+      if (mouseDown.current) {
+        mouseDown.current = false;
+        e.stopPropagation(); // Prevent multiple fires
+      }
+    };
+
+    // Add listeners to document for move/up (to handle dragging outside globe)
+    document.addEventListener('pointermove', handlePointerMove, { passive: true });
+    document.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [selectedRegion, dragFactor]);
+
+  // ✅ Local handler for pointer down on globe
+  const handlePointerDown = (e) => {
+    e.stopPropagation();
+    if (selectedRegion) return; // Don't allow drag when region is selected
+    mouseDown.current = true;
+    // Use tracked global mouse position
+    lastMouseX.current = currentMouseX.current;
+    lastMouseY.current = currentMouseY.current;
+  };
+
 
   // TopoJSON data load karna (smaller file size, faster loading)
+  const hasLoadedRef = useRef(false);
+  
   useEffect(() => {
+    // ✅ Prevent multiple fetches
+    if (hasLoadedRef.current || countries.length > 0) return;
+    
+    hasLoadedRef.current = true;
+    let isMounted = true;
+    
     fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
       .then((res) => res.json())
       .then((topojsonData) => {
+        if (!isMounted) return;
         // TopoJSON ko GeoJSON mein convert karo
         const geojson = topojson.feature(
           topojsonData,
           topojsonData.objects.countries
         );
-        console.log("Loaded TopoJSON, countries:", geojson.features.length);
         setCountries(geojson.features);
       })
       .catch((err) => {
+        if (!isMounted) return;
         console.error("Error loading TopoJSON:", err);
+        hasLoadedRef.current = false; // Retry on error
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Auto rotation
+  // ✅ Auto rotation with drag support - optimized
   useFrame((state, delta) => {
-    if (globeRef.current && !selectedRegion) {
+    if (!globeRef.current || selectedRegion) return;
+    
+    // Drag rotation
+    if (Math.abs(targetRotationX.current) > 0.0001 || Math.abs(targetRotationY.current) > 0.0001) {
+      globeRef.current.rotation.y += targetRotationX.current;
+      globeRef.current.rotation.x += targetRotationY.current;
+      
+      // Inertia effect
+      targetRotationX.current *= slowingFactor;
+      targetRotationY.current *= slowingFactor;
+      
+    }
+    
+    // Auto rotation (jab drag nahi ho raha)
+    if (!mouseDown.current && Math.abs(targetRotationX.current) < 0.001) {
       globeRef.current.rotation.y += delta * 0.05;
     }
   });
@@ -329,7 +417,12 @@ function Globe({
   });
 
   return (
-    <group ref={globeRef} position={[0, 0, 0]} rotation={[0, -1, 0]}>
+    <group 
+      ref={globeRef} 
+      position={[0, 0, 0]} 
+      rotation={[0, -1, 0]}
+      onPointerDown={handlePointerDown}
+    >
       {/* Main Earth Sphere - Dark base with wireframe look */}
 
       {/* Wireframe overlay for sphere structure - fine mesh */}
@@ -455,25 +548,7 @@ export default function InteractiveGlobe({ selectedRegion, onRegionClick }) {
           onRegionClick={onRegionClick}
           onRegionHover={setHoveredRegion}
         />
-<Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/horn-koppe_spring_1k.hdr" background={true} />
-     <OrbitControls
-      minDistance={5}
-      maxDistance={6}
-      autoRotate={!selectedRegion && !isAnimating}
-      autoRotateSpeed={0.5}
-      enableDamping={true}
-      dampingFactor={0.05}
-      mouseButtons={{
-        LEFT: 0, // Rotate
-        MIDDLE: -1, // Disable middle mouse zoom
-        RIGHT: 2, // Pan
-      }}
-      touches={{
-        ONE: 0, // Rotate on touch
-        TWO: -1, // Disable pinch zoom
-      }}
      
-     />
       </Canvas>
     </div>
   );
