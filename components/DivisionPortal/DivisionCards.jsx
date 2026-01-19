@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { regionsData } from '../../data/regions';
 import { AiOutlineClose, AiOutlineArrowRight } from 'react-icons/ai';
+import RegionSpecificAnimations from './RegionSpecificAnimations';
 
 export default function DivisionCards({ regionId, onDivisionClick, onBack }) {
   const region = regionsData[regionId];
@@ -161,6 +162,9 @@ export default function DivisionCards({ regionId, onDivisionClick, onBack }) {
             ))}
           </div>
         </div>
+
+        {/* Region-Specific Animations */}
+        <RegionSpecificAnimations regionId={regionId} glowColor={region.glowColor} />
 
         {/* Background Decoration */}
         <div

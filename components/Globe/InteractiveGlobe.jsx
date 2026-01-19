@@ -6,12 +6,28 @@ import { Sphere, OrbitControls, Html, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import * as topojson from "topojson-client";
 import { regionsData } from "../../data/regions";
- 
-// Convert lat/lng to 3D coordinates
+
+/**
+ * Convert Latitude/Longitude to 3D Coordinates
+ * Ye function lat/lng ko 3D space mein convert karta hai
+ * 
+ * @param {number} lat - Latitude (-90 to 90)
+ * @param {number} lng - Longitude (-180 to 180)
+ * @param {number} radius - Distance from globe center (zoom level)
+ * @returns {THREE.Vector3} - 3D position on sphere
+ * 
+ * Example: latLngToVector3(0, 20, 4.5) → Africa ke around camera position
+ */
 const latLngToVector3 = (lat, lng, radius) => {
+  // Convert latitude to spherical coordinates (phi angle)
+  // 90 - lat kyunki: North pole = 0°, Equator = 90°
   const phi = (90 - lat) * (Math.PI / 180);
+  
+  // Convert longitude to spherical coordinates (theta angle)
+  // +180 kyunki: -180° to 180° ko 0° to 360° mein convert karna
   const theta = (lng + 180) * (Math.PI / 180);
 
+  // Calculate 3D coordinates using spherical to cartesian conversion
   const x = -radius * Math.sin(phi) * Math.cos(theta);
   const y = radius * Math.cos(phi);
   const z = radius * Math.sin(phi) * Math.sin(theta);
@@ -19,50 +35,69 @@ const latLngToVector3 = (lat, lng, radius) => {
   return new THREE.Vector3(x, y, z);
 };
 
- 
-// Region Hotspot Component with Label
+/**
+ * Region Hotspot Component
+ * Ye component har region (Africa, Asia, etc.) ke liye clickable hotspot banata hai
+ * 
+ * Props:
+ * - region: Region data (name, position, glowColor)
+ * - isSelected: Kya ye region currently selected hai
+ * - isHovered: Mouse hover par hai ya nahi
+ * - onClick: Click handler function
+ * - onHover: Hover handler function
+ */
 function RegionHotspot({ region, isSelected, isHovered, onClick, onHover }) {
+  // Region ki position calculate karo (globe surface par, radius 2.1)
+  // useMemo use kiya taaki position sirf tab recalculate ho jab lat/lng change ho
   const position = useMemo(() => {
     return latLngToVector3(region.position.lat, region.position.lng, 2.1);
   }, [region.position.lat, region.position.lng]);
 
+  // Mesh reference for animation
   const meshRef = useRef();
 
+  // Har frame animation update karo
   useFrame(() => {
     if (meshRef.current) {
-      // Pulsing animation
+      // Hover ya selected par scale badhao (pulsing effect)
       const scale = isHovered || isSelected ? 1.3 : 1;
+      // Smooth scale transition using lerp (linear interpolation)
       meshRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
     }
   });
 
   return (
     <group position={position}>
+      {/* Main Hotspot Sphere - Clickable region marker */}
       <mesh
         ref={meshRef}
-        onClick={onClick}
-        onPointerOver={onHover}
-        onPointerOut={() => onHover(false)}
+        onClick={onClick}              // Click par region select karo
+        onPointerOver={onHover}        // Mouse hover par
+        onPointerOut={() => onHover(false)}  // Mouse leave par
       >
+        {/* Small sphere (radius 0.05) - main hotspot */}
         <sphereGeometry args={[0.05, 16, 16]} />
         <meshStandardMaterial
-          color={region.glowColor}
-          emissive={region.glowColor}
-          emissiveIntensity={isHovered || isSelected ? 1 : 0.5}
+          color={region.glowColor}      // Region ka color (e.g., Africa = green)
+          emissive={region.glowColor}   // Glow effect ke liye
+          emissiveIntensity={isHovered || isSelected ? 1 : 0.5}  // Hover par zyada glow
         />
       </mesh>
-      {/* Glow effect */}
+      
+      {/* Outer Glow Ring - Visual effect ke liye */}
       <mesh>
+        {/* Larger sphere (radius 0.08) - glow effect */}
         <sphereGeometry args={[0.08, 16, 16]} />
         <meshStandardMaterial
           color={region.glowColor}
           emissive={region.glowColor}
           emissiveIntensity={isHovered || isSelected ? 0.3 : 0.1}
           transparent
-          opacity={0.5}
+          opacity={0.5}  // Semi-transparent glow
         />
       </mesh>
-      {/* Region Label - shows on hover */}
+      
+      {/* Region Label - Hover par show hota hai */}
       {isHovered && (
         <Html
           position={[0, 0.15, 0]}
@@ -280,12 +315,105 @@ function CountryPolygons({ countries }) {
   );
 }
 
+/**
+ * Subdivision Hotspot Component
+ * Ye component subdivisions (Micro-grids, Clean-tech Labs, etc.) ke liye hotspots banata hai
+ * Jab region select hota hai, to ye subdivisions globe par show hote hain
+ * 
+ * Props:
+ * - subdivision: Subdivision data (name, position, description)
+ * - region: Parent region data (glowColor ke liye)
+ * - isHovered: Mouse hover state
+ * - onClick: Click handler (modal open karta hai)
+ * - onHover: Hover handler
+ */
+function SubdivisionHotspot({ subdivision, region, isHovered, onClick, onHover }) {
+  // Subdivision ki position calculate karo
+  // Agar position nahi hai, to null return karo
+  const position = useMemo(() => {
+    if (!subdivision.position) return null;
+    return latLngToVector3(subdivision.position.lat, subdivision.position.lng, 2.1);
+  }, [subdivision.position]);
+
+  const meshRef = useRef();
+
+  // Smooth scale animation on hover
+  useFrame(() => {
+    if (meshRef.current) {
+      const scale = isHovered ? 1.4 : 1.1;  // Hover par zyada scale
+      meshRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
+    }
+  });
+
+  // Agar position nahi hai, to kuch render mat karo
+  if (!position) return null;
+
+  return (
+    <group position={position}>
+      {/* Main hotspot - larger and more visible */}
+      <mesh
+        ref={meshRef}
+        onClick={onClick}
+        onPointerOver={onHover}
+        onPointerOut={() => onHover(false)}
+      >
+        <sphereGeometry args={[0.02, 16, 16]} />
+        <meshStandardMaterial
+          color={region.glowColor}
+          emissive={region.glowColor}
+          emissiveIntensity={isHovered ? 1.2 : 0.8}
+        />
+      </mesh>
+      {/* Glow effect */}
+      <mesh onClick={onClick}>
+        <sphereGeometry args={[0.06, 16, 16]} />
+        <meshStandardMaterial
+          color={region.glowColor}
+          emissive={region.glowColor}
+          emissiveIntensity={0.3}
+          transparent
+          opacity={0.4}
+        />
+      </mesh>
+      {/* Subdivision Label - Region select hone par hamesha visible */}
+      {/* Html component se 3D space mein HTML render karte hain */}
+      <Html
+        position={[0, 0.12, 0]}  // Hotspot ke upar 0.12 units
+        center                   // Label center align
+        distanceFactor={5}       // Distance se size adjust
+        style={{
+          pointerEvents: "none",  // Click events ignore
+          userSelect: "none",     // Text select disable
+        }}
+      >
+        <div
+          className="bg-slate-900/90 backdrop-blur-sm border rounded-lg whitespace-nowrap shadow-lg"
+          style={{ 
+            padding: "4px 6px",
+            borderColor: region.glowColor + '60',
+            borderWidth: '1px'
+          }}
+        >
+          <p className="text-[10px] font-medium tracking-wide " style={{ color: region.glowColor }}>
+            {subdivision.name}
+          </p>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
 // Main Globe Component
 function Globe({
   selectedRegion,
+  selectedSubdivision,  // NEW: To hide subdivisions when modal open
   hoveredRegion,
+  hoveredSubdivision,
   onRegionClick,
   onRegionHover,
+  onSubdivisionClick,
+  onSubdivisionHover,
+  useCustomControls = true, // ✅ Desktop par custom controls, mobile par nahi
 }) {
   const globeRef = useRef();
   const inglobeRef = useRef();
@@ -313,9 +441,9 @@ function Globe({
     return () => document.removeEventListener('mousemove', trackMouse);
   }, []);
 
-  // ✅ Document-level pointer move/up handlers for smooth dragging
+  // ✅ Document-level pointer move/up handlers for smooth dragging (sirf desktop par)
   useEffect(() => {
-    if (selectedRegion) return; // Don't set up drag when region is selected
+    if (!useCustomControls) return; // ✅ Custom controls sirf desktop par
 
     const handlePointerMove = (e) => {
       if (!mouseDown.current) return;
@@ -344,18 +472,17 @@ function Globe({
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [selectedRegion, dragFactor]);
+  }, [dragFactor, useCustomControls]);
 
-  // ✅ Local handler for pointer down on globe
+  // ✅ Local handler for pointer down on globe (sirf desktop par)
   const handlePointerDown = (e) => {
+    if (!useCustomControls) return; // ✅ Custom controls sirf desktop par
     e.stopPropagation();
-    if (selectedRegion) return; // Don't allow drag when region is selected
     mouseDown.current = true;
     // Use tracked global mouse position
     lastMouseX.current = currentMouseX.current;
     lastMouseY.current = currentMouseY.current;
   };
-
 
   // TopoJSON data load karna (smaller file size, faster loading)
   const hasLoadedRef = useRef(false);
@@ -389,11 +516,11 @@ function Globe({
     };
   }, []);
 
-  // ✅ Auto rotation with drag support - optimized
+  // ✅ Auto rotation with drag support - optimized (sirf desktop par)
   useFrame((state, delta) => {
-    if (!globeRef.current || selectedRegion) return;
+    if (!globeRef.current || !useCustomControls) return; // ✅ Custom controls sirf desktop par
     
-    // Drag rotation
+    // Drag rotation (always enabled, even when region is selected)
     if (Math.abs(targetRotationX.current) > 0.0001 || Math.abs(targetRotationY.current) > 0.0001) {
       globeRef.current.rotation.y += targetRotationX.current;
       globeRef.current.rotation.x += targetRotationY.current;
@@ -404,8 +531,8 @@ function Globe({
       
     }
     
-    // Auto rotation (jab drag nahi ho raha)
-    if (!mouseDown.current && Math.abs(targetRotationX.current) < 0.001) {
+    // Auto rotation (jab drag nahi ho raha aur region select nahi hai)
+    if (!mouseDown.current && Math.abs(targetRotationX.current) < 0.001 && !selectedRegion) {
       globeRef.current.rotation.y += delta * 0.05;
     }
   });
@@ -423,12 +550,9 @@ function Globe({
       rotation={[0, -1, 0]}
       onPointerDown={handlePointerDown}
     >
-      {/* Main Earth Sphere - Dark base with wireframe look */}
-
       {/* Wireframe overlay for sphere structure - fine mesh */}
       <mesh ref={inglobeRef}>
         <sphereGeometry args={[1.69, 15, 15]} />
-
         <meshBasicMaterial color="#fff" wireframe />
       </mesh>
 
@@ -436,118 +560,122 @@ function Globe({
       <CountryPolygons countries={countries} />
 
       {/* Region Hotspots */}
-      {Object.values(regionsData).map((region) => (
+      {!selectedRegion && Object.values(regionsData).map((region) => (
         <RegionHotspot
           key={region.id}
           region={region}
-          isSelected={selectedRegion === region.id}
+          isSelected={false}
           isHovered={hoveredRegion === region.id}
           onClick={() => onRegionClick(region.id)}
           onHover={(isHovering) => onRegionHover(isHovering ? region.id : null)}
         />
       ))}
+
+      {/* Subdivision Hotspots - Jab region select ho tab show, but modal open par hide */}
+      {selectedRegion && !selectedSubdivision && (() => {
+        const region = regionsData[selectedRegion];
+        if (!region) return null;
+        
+        /**
+         * Sab subdivisions collect karo
+         * Har region ke andar multiple divisions hote hain
+         * Har division ke andar multiple subdivisions hote hain
+         * Sirf un subdivisions ko show karo jinke paas position hai
+         */
+        const allSubdivisions = [];
+        region.mainDivisions.forEach(division => {
+          if (division.subdivisions) {
+            division.subdivisions.forEach(sub => {
+              // Sirf wo subdivisions add karo jinke paas position data hai
+              if (sub.position) {
+                allSubdivisions.push({ ...sub, divisionId: division.id });
+              }
+            });
+          }
+        });
+
+        // Sab subdivisions ko render karo
+        return allSubdivisions.map((subdivision) => (
+          <SubdivisionHotspot
+            key={subdivision.id}
+            subdivision={subdivision}
+            region={region}
+            isHovered={hoveredSubdivision === subdivision.id}
+            onClick={() => onSubdivisionClick(subdivision)}
+            onHover={(isHovering) => onSubdivisionHover(isHovering ? subdivision.id : null)}
+          />
+        ));
+      })()}
     </group>
   );
 }
 
-// Camera Controller for smooth zoom animation
-function CameraController({ selectedRegion, onAnimationComplete }) {
-  const { camera } = useThree();
-  const targetPosition = useRef(new THREE.Vector3(0, 0, 5));
-  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
-  const isAnimating = useRef(false);
-
-  useEffect(() => {
-    if (selectedRegion) {
-      const region = regionsData[selectedRegion];
-      if (region) {
-        // Zoom to region position
-        const pos = latLngToVector3(
-          region.position.lat,
-          region.position.lng,
-          3.5
-        );
-        targetPosition.current = pos;
-        targetLookAt.current = latLngToVector3(
-          region.position.lat,
-          region.position.lng,
-          2
-        );
-        isAnimating.current = true;
-        onAnimationComplete?.(true); // Animation started
-      }
-    } else {
-      // Return to default view
-      targetPosition.current = new THREE.Vector3(0, 0, 5);
-      targetLookAt.current = new THREE.Vector3(0, 0, 0);
-      isAnimating.current = true;
-      onAnimationComplete?.(true); // Animation started
-    }
-  }, [selectedRegion, onAnimationComplete]);
-
-  useFrame(() => {
-    if (isAnimating.current) {
-      const distance = camera.position.distanceTo(targetPosition.current);
-
-      // Smooth camera movement
-      camera.position.lerp(targetPosition.current, 0.08);
-
-      // Smooth look at
-      const direction = new THREE.Vector3()
-        .subVectors(targetLookAt.current, camera.position)
-        .normalize();
-      const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 0, -1),
-        direction
-      );
-      camera.quaternion.slerp(targetQuaternion, 0.08);
-
-      // Stop animating when close enough to target
-      if (distance < 0.1) {
-        isAnimating.current = false;
-        // Snap to exact position when close and no region selected
-        if (!selectedRegion) {
-          camera.position.copy(targetPosition.current);
-          camera.lookAt(targetLookAt.current);
-        }
-        onAnimationComplete?.(false); // Animation completed
-      }
-    }
-  });
-
-  return null;
-}
- 
-
- 
 // Main Interactive Globe Component
-export default function InteractiveGlobe({ selectedRegion, onRegionClick }) {
+export default function InteractiveGlobe({ 
+  selectedRegion,
+  selectedSubdivision,  // NEW: Subdivision state to hide hotspots when modal open
+  onRegionClick,
+  onSubdivisionClick,
+}) {
   const [hoveredRegion, setHoveredRegion] = useState(null);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const spotLightRef = useRef();
+  const [hoveredSubdivision, setHoveredSubdivision] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // ✅ Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div className="w-full h-screen">
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 65 }}
-        gl={{ antialias: true }}
+        camera={{ 
+          position: [0, 0, isMobile ? 6 : 5], 
+          fov: isMobile ? 75 : 65 
+        }}
+        gl={{ 
+          antialias: !isMobile, // Disable antialiasing on mobile for better performance
+          powerPreference: "high-performance"
+        }}
       >
         {/* Spot Light - Sun-like effect */}
         <ambientLight intensity={5} color="#7dd3fc" />
        
         <directionalLight intensity={5} position={[5, 10, 5]} castShadow />
         
+        {/* ✅ OrbitControls - sirf mobile par (built-in touch support) */}
+        {isMobile && (
+          <OrbitControls
+            enableRotate={true}
+            enableZoom={true}
+            enablePan={false}
+            autoRotate={!selectedRegion}
+            autoRotateSpeed={0.5}
+            minDistance={3}
+            maxDistance={10}
+            target={[0, 0, 0]}
+            enableDamping={true}
+            dampingFactor={0.05}
+          />
+        )}
 
-        <CameraController
-          selectedRegion={selectedRegion}
-          onAnimationComplete={setIsAnimating}
-        />
         <Globe
           selectedRegion={selectedRegion}
+          selectedSubdivision={selectedSubdivision}
           hoveredRegion={hoveredRegion}
+          hoveredSubdivision={hoveredSubdivision}
           onRegionClick={onRegionClick}
           onRegionHover={setHoveredRegion}
+          onSubdivisionClick={onSubdivisionClick}
+          onSubdivisionHover={setHoveredSubdivision}
+          useCustomControls={!isMobile} // ✅ Desktop par custom controls, mobile par OrbitControls
         />
+
      
       </Canvas>
     </div>

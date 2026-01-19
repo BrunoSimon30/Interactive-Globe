@@ -1,11 +1,14 @@
 import { useState } from "react";
 
 import dynamic from "next/dynamic";
-import DivisionCards from "../components/DivisionPortal/DivisionCards";
 import DivisionDetail from "../components/DivisionPortal/DivisionDetail";
-import Image from "next/image";
-import { BsGlobeAmericas } from "react-icons/bs";
+import Caption from "../components/UI/Caption";
+import SubdivisionModal from "../components/UI/SubdivisionModal";
+
+
+import { regionsData } from "../data/regions";
 import Head from "next/head";
+import Header from "@/components/Header";
 
 // Dynamically import Globe to avoid SSR issues
 const InteractiveGlobe = dynamic(
@@ -16,38 +19,44 @@ const InteractiveGlobe = dynamic(
 export default function Home() {
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [selectedDivision, setSelectedDivision] = useState(null);
+  const [selectedSubdivision, setSelectedSubdivision] = useState(null);
 
   const handleRegionClick = (regionId) => {
     setSelectedRegion(regionId);
     setSelectedDivision(null);
+    setSelectedSubdivision(null);
   };
 
-  const handleDivisionClick = (division) => {
-    setSelectedDivision(division);
+  const handleSubdivisionClick = (subdivision) => {
+    setSelectedSubdivision(subdivision);
   };
 
   const handleBack = () => {
-    if (selectedDivision) {
+    if (selectedSubdivision) {
+      setSelectedSubdivision(null);
+    } else if (selectedDivision) {
       setSelectedDivision(null);
     } else if (selectedRegion) {
       setSelectedRegion(null);
     }
   };
 
+  // Back to region handler - Modal close + Region deselect
+  const handleBackToRegion = () => {
+    setSelectedSubdivision(null); // Close modal
+    setSelectedRegion(null); // Deselect region (globe zoom out)
+  };
+
+  const currentRegion = selectedRegion ? regionsData[selectedRegion] : null;
+
   return (
     <>
       <Head>
         <title>SJEG Globe | Interactive Globe</title>
       </Head>
+      <Header/>
       <section>
-        <header className="fixed top-0 left-0 w-full z-50  flex justify-between items-center px-8 py-4 ">
-          <div>
-            <Image src="/img/logo.png" alt="logo" width={120} height={120} />
-          </div>
-          <div className="w-[40px] h-[40px] flex items-center justify-center rounded-full bg-[#2c3144]">
-            <BsGlobeAmericas className="text-2xl text-[#d2b6ec]" />
-          </div>
-        </header>
+     
         <div
           className={`  relative w-full h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden`}
         >
@@ -60,40 +69,39 @@ export default function Home() {
           <div className="absolute inset-0">
             <InteractiveGlobe
               selectedRegion={selectedRegion}
+              selectedSubdivision={selectedSubdivision} // Pass subdivision state
               onRegionClick={handleRegionClick}
+              onSubdivisionClick={handleSubdivisionClick}
             />
           </div>
 
-          {/* Caption - only show when no region selected */}
-          {/* <Caption show={!selectedRegion && !selectedDivision} /> */}
+          {/* Caption or Back Button - single component handles both */}
+          <Caption
+            show={!selectedRegion && !selectedDivision && !selectedSubdivision}
+            selectedRegion={selectedRegion && !selectedSubdivision ? selectedRegion : null}
+            onBackToRegion={selectedRegion && !selectedSubdivision ? handleBackToRegion : null}
+            regionGlowColor={currentRegion?.glowColor}
+          />
+          {/* Note: Division Cards removed - subdivisions now show directly on globe */}
 
-          {/* Division Cards - show when region selected but no division */}
-          {selectedRegion && !selectedDivision && (
-            <DivisionCards
-              regionId={selectedRegion}
-              onDivisionClick={handleDivisionClick}
-              onBack={handleBack}
-            />
-          )}
-
-          {/* Division Detail - show when division selected */}
-          {selectedDivision && selectedRegion && (
+          {/* Division Detail - show when division selected (if needed) */}
+          {selectedDivision && selectedRegion && !selectedSubdivision && (
             <DivisionDetail
               division={selectedDivision}
               regionId={selectedRegion}
               onBack={handleBack}
             />
           )}
+
+          {/* Subdivision Modal - show when subdivision clicked */}
+          <SubdivisionModal
+            subdivision={selectedSubdivision}
+            region={currentRegion}
+            isOpen={!!selectedSubdivision}
+            onClose={() => setSelectedSubdivision(null)} // Just close modal
+            onBackToRegion={handleBackToRegion} // Back to region (deselect)
+          />
         </div>
-        {/* <footer className="fixed bottom-0 left-0 w-full z-50  pb-4 px-8">
-        <div className="text-right">
-          <div className="flex items-center gap-4 justify-end">
-            <Link href="/" className="text-2xl text-[#d2b6ec]"><FaInstagram /></Link>
-            <Link href="/" className="text-2xl text-[#d2b6ec]"><AiOutlineFacebook /></Link>
-            
-          </div>
-        </div>
-      </footer> */}
       </section>
     </>
   );
